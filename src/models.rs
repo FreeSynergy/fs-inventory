@@ -43,6 +43,7 @@ pub enum ResourceStatus {
 }
 
 impl ResourceStatus {
+    #[must_use]
     pub fn needs_attention(&self) -> bool {
         matches!(self, Self::Error(_) | Self::SetupRequired)
     }
@@ -115,6 +116,7 @@ pub enum ServiceStatus {
 }
 
 impl ServiceStatus {
+    #[must_use]
     pub fn is_running(&self) -> bool {
         matches!(self, Self::Running)
     }
@@ -182,7 +184,7 @@ impl TryFrom<entity::service_instance::Model> for ServiceInstance {
             variables: serde_json::from_str(&m.variables)?,
             network: m.network,
             status: serde_json::from_str(&m.status)?,
-            port: m.port.map(|p| p as u16),
+            port: m.port.map(|p| u16::try_from(p).unwrap_or(0)),
             s3_paths: serde_json::from_str(&m.s3_paths)?,
         })
     }

@@ -1,4 +1,4 @@
-//! `fs-inventory` — local inventory of installed FreeSynergy resources.
+//! `fs-inventory` — local inventory of installed `FreeSynergy` resources.
 //!
 //! The Inventory answers the question *"What is installed on this node?"*.
 //! It is the **single source of truth** for:
@@ -8,7 +8,7 @@
 //!
 //! # Database
 //!
-//! Uses its own SQLite file: `fs-inventory.db`.
+//! Uses its own `SQLite` file: `fs-inventory.db`.
 //! No other component may maintain a parallel list of installed resources.
 //!
 //! # Example

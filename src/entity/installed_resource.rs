@@ -1,4 +1,4 @@
-//! SeaORM entity for the `installed_resources` table.
+//! `SeaORM` entity for the `installed_resources` table.
 
 use sea_orm::entity::prelude::*;
 

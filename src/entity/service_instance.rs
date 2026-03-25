@@ -1,4 +1,4 @@
-//! SeaORM entity for the `service_instances` table.
+//! `SeaORM` entity for the `service_instances` table.
 
 use sea_orm::entity::prelude::*;
 

@@ -53,12 +53,16 @@ impl Inventory {
     /// Open (or create) the inventory database at the given path.
     ///
     /// Use `"sqlite::memory:"` in tests.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InventoryError`] if the database connection fails or the schema cannot be applied.
     #[instrument(name = "inventory.open")]
     pub async fn open(path: &str) -> Result<Self, InventoryError> {
         let url = if path == ":memory:" {
             "sqlite::memory:".to_string()
         } else {
-            format!("sqlite://{}?mode=rwc", path)
+            format!("sqlite://{path}?mode=rwc")
         };
         let db = Database::connect(&url).await?;
         db.execute_unprepared(SCHEMA).await?;
@@ -68,6 +72,10 @@ impl Inventory {
     // ── InstalledResource ─────────────────────────────────────────────────────
 
     /// Install a new resource. Returns `AlreadyInstalled` if the id exists.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InventoryError::AlreadyInstalled`] if the id already exists, or a database error.
     #[instrument(name = "inventory.install", skip(self, resource))]
     pub async fn install(&self, resource: &InstalledResource) -> Result<(), InventoryError> {
         if installed_resource::Entity::find_by_id(&resource.id)
@@ -96,6 +104,10 @@ impl Inventory {
     }
 
     /// Remove an installed resource by id.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InventoryError::NotFound`] if the id does not exist, or a database error.
     #[instrument(name = "inventory.uninstall", skip(self))]
     pub async fn uninstall(&self, id: &str) -> Result<(), InventoryError> {
         let model = installed_resource::Entity::find_by_id(id)
@@ -108,6 +120,10 @@ impl Inventory {
     }
 
     /// All installed resources.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InventoryError`] on database or deserialization failure.
     pub async fn all_resources(&self) -> Result<Vec<InstalledResource>, InventoryError> {
         installed_resource::Entity::find()
             .all(&self.db)
@@ -118,6 +134,10 @@ impl Inventory {
     }
 
     /// Find an installed resource by id.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InventoryError`] on database or deserialization failure.
     pub async fn resource(&self, id: &str) -> Result<Option<InstalledResource>, InventoryError> {
         installed_resource::Entity::find_by_id(id)
             .one(&self.db)
@@ -127,6 +147,10 @@ impl Inventory {
     }
 
     /// Insert a resource, or update its status if already installed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InventoryError`] on database or serialization failure.
     #[instrument(name = "inventory.upsert_resource", skip(self, resource))]
     pub async fn upsert_resource(
         &self,
@@ -145,6 +169,10 @@ impl Inventory {
     // ── ServiceInstance ───────────────────────────────────────────────────────
 
     /// Register a service instance.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InventoryError`] on database or serialization failure.
     #[instrument(name = "inventory.add_service", skip(self, svc))]
     pub async fn add_service(&self, svc: &ServiceInstance) -> Result<(), InventoryError> {
         service_instance::ActiveModel {
@@ -156,7 +184,7 @@ impl Inventory {
             variables: Set(serde_json::to_string(&svc.variables)?),
             network: Set(svc.network.clone()),
             status: Set(serde_json::to_string(&svc.status)?),
-            port: Set(svc.port.map(|p| p as i32)),
+            port: Set(svc.port.map(i32::from)),
             s3_paths: Set(serde_json::to_string(&svc.s3_paths)?),
         }
         .insert(&self.db)
@@ -165,6 +193,10 @@ impl Inventory {
     }
 
     /// All service instances providing a specific role.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InventoryError`] on database or deserialization failure.
     #[instrument(name = "inventory.services_with_role", skip(self))]
     pub async fn services_with_role(
         &self,
@@ -181,6 +213,10 @@ impl Inventory {
     }
 
     /// All service instances.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InventoryError`] on database or deserialization failure.
     pub async fn all_services(&self) -> Result<Vec<ServiceInstance>, InventoryError> {
         service_instance::Entity::find()
             .all(&self.db)
@@ -191,6 +227,10 @@ impl Inventory {
     }
 
     /// Register a service instance or update an existing one with the same name.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InventoryError`] on database or serialization failure.
     #[instrument(name = "inventory.upsert_service", skip(self, svc))]
     pub async fn upsert_service(&self, svc: &ServiceInstance) -> Result<(), InventoryError> {
         let existing = service_instance::Entity::find()
@@ -204,7 +244,7 @@ impl Inventory {
             active.roles_provided = Set(serde_json::to_string(&svc.roles_provided)?);
             active.roles_required = Set(serde_json::to_string(&svc.roles_required)?);
             active.network = Set(svc.network.clone());
-            active.port = Set(svc.port.map(|p| p as i32));
+            active.port = Set(svc.port.map(i32::from));
             active.update(&self.db).await?;
         } else {
             self.add_service(svc).await?;
@@ -215,6 +255,10 @@ impl Inventory {
     // ── Status updates ────────────────────────────────────────────────────────
 
     /// Update the runtime status of an installed resource.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InventoryError::NotFound`] if the id does not exist, or a database error.
     #[instrument(name = "inventory.set_resource_status", skip(self, status))]
     pub async fn set_resource_status(
         &self,
@@ -232,6 +276,10 @@ impl Inventory {
     }
 
     /// Update the runtime status of a service instance by name.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InventoryError::NotFound`] if the instance is not found, or a database error.
     #[instrument(name = "inventory.set_service_status_by_name", skip(self, status))]
     pub async fn set_service_status_by_name(
         &self,
