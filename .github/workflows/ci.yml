@@ -17,6 +17,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Checkout fs-libs (fs-types path dep)
+        run: |
+          git clone --no-checkout --depth=1 --filter=blob:none \
+            "https://x-access-token:${{ secrets.FS_LIBS_TOKEN }}@github.com/FreeSynergy/fs-libs.git" \
+            $GITHUB_WORKSPACE/../fs-libs
+          cd $GITHUB_WORKSPACE/../fs-libs
+          git sparse-checkout init
+          git sparse-checkout set fs-types
+          git checkout
+
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -29,7 +39,7 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: clippy
-        run: cargo clippy --all-targets --all-features
+        run: cargo clippy --all-targets --all-features -- -D warnings
 
       - name: test
         run: cargo test --all-features
