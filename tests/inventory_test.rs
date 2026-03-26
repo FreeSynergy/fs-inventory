@@ -1,6 +1,6 @@
 //! Integration tests for fs-inventory.
 //!
-//! Uses an in-memory SQLite database so no files are left on disk.
+//! Uses an in-memory `SQLite` database so no files are left on disk.
 
 use fs_inventory::{
     InstalledResource, Inventory, ReleaseChannel, ResourceStatus, ServiceInstance, ServiceStatus,
