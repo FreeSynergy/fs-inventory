@@ -26,11 +26,13 @@
 #![deny(clippy::all, clippy::pedantic, warnings)]
 #![allow(clippy::module_name_repetitions)]
 
+pub mod bus_handler;
 pub mod entity;
 pub mod error;
 pub mod models;
 pub mod repo;
 
+pub use bus_handler::{InventoryBusHandler, PackageInstalledPayload, PackageRemovedPayload};
 pub use error::InventoryError;
 pub use models::{
     InstalledResource, ReleaseChannel, ResourceStatus, ServiceInstance, ServiceStatus,
