@@ -1,0 +1,78 @@
+syntax = "proto3";
+
+package inventory;
+
+// Local inventory service — answers "what is installed?" and "what is running?".
+service InventoryService {
+    // Install or update a resource.
+    rpc UpsertResource  (UpsertResourceRequest)  returns (UpsertResourceResponse);
+    // Remove an installed resource by id.
+    rpc Uninstall       (UninstallRequest)        returns (UninstallResponse);
+    // Return all installed resources.
+    rpc ListResources   (ListResourcesRequest)    returns (ListResourcesResponse);
+    // Return a single resource by id.
+    rpc GetResource     (GetResourceRequest)      returns (GetResourceResponse);
+    // Register or update a service instance.
+    rpc UpsertService   (UpsertServiceRequest)    returns (UpsertServiceResponse);
+    // Return service instances, optionally filtered by role.
+    rpc ListServices    (ListServicesRequest)     returns (ListServicesResponse);
+    // Return inventory summary (counts).
+    rpc GetStatus       (GetStatusRequest)        returns (GetStatusResponse);
+}
+
+// ── Resource ──────────────────────────────────────────────────────────────────
+
+message ResourceRecord {
+    string id            = 1;
+    string resource_type = 2;  // JSON-encoded ResourceType
+    string version       = 3;
+    string channel       = 4;  // "stable" | "testing" | "nightly"
+    string installed_at  = 5;  // ISO-8601
+    string status        = 6;  // JSON-encoded ResourceStatus
+    string config_path   = 7;
+    string data_path     = 8;
+    string validation    = 9;  // JSON-encoded ValidationStatus
+}
+
+message UpsertResourceRequest  { ResourceRecord resource = 1; }
+message UpsertResourceResponse { bool ok = 1; string message = 2; }
+
+message UninstallRequest  { string id = 1; }
+message UninstallResponse { bool ok = 1; string message = 2; }
+
+message ListResourcesRequest  {}
+message ListResourcesResponse { repeated ResourceRecord resources = 1; }
+
+message GetResourceRequest  { string id = 1; }
+message GetResourceResponse { bool found = 1; ResourceRecord resource = 2; }
+
+// ── Service ───────────────────────────────────────────────────────────────────
+
+message ServiceRecord {
+    string          id             = 1;
+    string          resource_id    = 2;
+    string          instance_name  = 3;
+    repeated string roles_provided = 4;
+    repeated string roles_required = 5;
+    string          variables_json = 6;  // JSON: Vec<ConfiguredVar>
+    string          network        = 7;
+    string          status         = 8;  // JSON-encoded ServiceStatus
+    uint32          port           = 9;  // 0 means "no port"
+    repeated string s3_paths       = 10;
+}
+
+message UpsertServiceRequest  { ServiceRecord service = 1; }
+message UpsertServiceResponse { bool ok = 1; string message = 2; }
+
+// role_filter is optional — empty string means "all services".
+message ListServicesRequest  { string role_filter = 1; }
+message ListServicesResponse { repeated ServiceRecord services = 1; }
+
+// ── Status ────────────────────────────────────────────────────────────────────
+
+message GetStatusRequest  {}
+message GetStatusResponse {
+    bool   ok             = 1;
+    uint32 resource_count = 2;
+    uint32 service_count  = 3;
+}

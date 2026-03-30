@@ -1,10 +1,14 @@
-//! `Inventory` — the primary interface to `fs-inventory.db`.
+//! `Inventory` — SQLite-backed implementation of [`crate::store::InventoryStore`].
+
+use async_trait::async_trait;
 
 use crate::{
     entity::{installed_resource, service_instance},
     error::InventoryError,
     models::{InstalledResource, ResourceStatus, ServiceInstance, ServiceStatus},
+    store::InventoryStore,
 };
+use fs_db::DbConfig;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, Database, DatabaseConnection,
     EntityTrait, QueryFilter,
@@ -50,21 +54,16 @@ pub struct Inventory {
 }
 
 impl Inventory {
-    /// Open (or create) the inventory database at the given path.
+    /// Open (or create) the inventory database using the given [`DbConfig`].
     ///
-    /// Use `"sqlite::memory:"` in tests.
+    /// Use [`DbConfig::sqlite(":memory:")`] in tests.
     ///
     /// # Errors
     ///
     /// Returns [`InventoryError`] if the database connection fails or the schema cannot be applied.
-    #[instrument(name = "inventory.open")]
-    pub async fn open(path: &str) -> Result<Self, InventoryError> {
-        let url = if path == ":memory:" {
-            "sqlite::memory:".to_string()
-        } else {
-            format!("sqlite://{path}?mode=rwc")
-        };
-        let db = Database::connect(&url).await?;
+    #[instrument(name = "inventory.open", skip(config))]
+    pub async fn open(config: DbConfig) -> Result<Self, InventoryError> {
+        let db = Database::connect(&config.url).await?;
         db.execute_unprepared(SCHEMA).await?;
         Ok(Self { db })
     }
@@ -297,5 +296,54 @@ impl Inventory {
         active.status = Set(serde_json::to_string(status)?);
         active.update(&self.db).await?;
         Ok(())
+    }
+}
+
+// ── InventoryStore impl ───────────────────────────────────────────────────────
+
+#[async_trait]
+impl InventoryStore for Inventory {
+    async fn upsert_resource(&self, resource: &InstalledResource) -> Result<(), InventoryError> {
+        self.upsert_resource(resource).await
+    }
+
+    async fn uninstall(&self, id: &str) -> Result<(), InventoryError> {
+        self.uninstall(id).await
+    }
+
+    async fn list_resources(&self) -> Result<Vec<InstalledResource>, InventoryError> {
+        self.all_resources().await
+    }
+
+    async fn get_resource(&self, id: &str) -> Result<Option<InstalledResource>, InventoryError> {
+        self.resource(id).await
+    }
+
+    async fn set_resource_status(
+        &self,
+        id: &str,
+        status: &ResourceStatus,
+    ) -> Result<(), InventoryError> {
+        self.set_resource_status(id, status).await
+    }
+
+    async fn upsert_service(&self, svc: &ServiceInstance) -> Result<(), InventoryError> {
+        self.upsert_service(svc).await
+    }
+
+    async fn list_services(&self) -> Result<Vec<ServiceInstance>, InventoryError> {
+        self.all_services().await
+    }
+
+    async fn services_with_role(&self, role: &str) -> Result<Vec<ServiceInstance>, InventoryError> {
+        self.services_with_role(role).await
+    }
+
+    async fn set_service_status_by_name(
+        &self,
+        instance_name: &str,
+        status: &ServiceStatus,
+    ) -> Result<(), InventoryError> {
+        self.set_service_status_by_name(instance_name, status).await
     }
 }

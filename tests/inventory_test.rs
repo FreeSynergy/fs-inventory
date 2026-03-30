@@ -3,7 +3,8 @@
 //! Uses an in-memory `SQLite` database so no files are left on disk.
 
 use fs_inventory::{
-    InstalledResource, Inventory, ReleaseChannel, ResourceStatus, ServiceInstance, ServiceStatus,
+    DbConfig, InstalledResource, Inventory, ReleaseChannel, ResourceStatus, ServiceInstance,
+    ServiceStatus,
 };
 use fs_types::{ResourceType, ValidationStatus};
 
@@ -37,7 +38,7 @@ fn test_service(resource_id: &str) -> ServiceInstance {
 }
 
 async fn open_memory_db() -> Inventory {
-    Inventory::open(":memory:")
+    Inventory::open(DbConfig::sqlite(":memory:"))
         .await
         .expect("failed to open in-memory inventory")
 }

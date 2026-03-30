@@ -1,0 +1,30 @@
+[package]
+id          = "fs-inventory"
+name        = "Inventory"
+description = "Local inventory of installed FreeSynergy resources — answers 'what is installed?'"
+version     = "0.1.0"
+kind        = "service"
+namespace   = "freesynergy"
+license     = "MIT"
+authors     = ["FreeSynergy.Net"]
+repository  = "https://github.com/FreeSynergy/fs-inventory"
+icon        = "assets/icon.svg"
+
+[runtime]
+binary      = "fs-inventory"
+args        = ["serve"]
+ports       = [50052, 8082]
+data_dirs   = ["/var/lib/freesynergy"]
+
+[capabilities]
+provides    = ["inventory"]
+requires    = []
+
+[grpc]
+port        = 50052
+proto       = "proto/inventory.proto"
+
+[rest]
+port        = 8082
+openapi     = "/api-docs/openapi.json"
+swagger_ui  = "/swagger-ui"
