@@ -239,5 +239,5 @@ async fn bus_handler_removes_package_on_removed_event() {
 async fn bus_handler_topic_pattern_is_inventory_namespace() {
     let inv = inventory_in_memory().await;
     let handler = InventoryBusHandler::new(inv);
-    assert_eq!(handler.topic_pattern(), "inventory::*");
+    assert_eq!(handler.topic_pattern(), "inventory::#");
 }
