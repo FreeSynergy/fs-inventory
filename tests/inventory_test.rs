@@ -2,9 +2,15 @@
 //!
 //! Uses an in-memory `SQLite` database so no files are left on disk.
 
+use std::sync::Arc;
+
+use fs_bus::topics::{
+    INVENTORY_PACKAGE_INSTALLED, INVENTORY_PACKAGE_REMOVED, INVENTORY_PACKAGE_UPDATED,
+};
+use fs_bus::{Event, TopicHandler};
 use fs_inventory::{
-    DbConfig, InstalledResource, Inventory, ReleaseChannel, ResourceStatus, ServiceInstance,
-    ServiceStatus,
+    DbConfig, InstalledResource, Inventory, InventoryBusHandler, PackageInstalledPayload,
+    PackageRemovedPayload, ReleaseChannel, ResourceStatus, ServiceInstance, ServiceStatus,
 };
 use fs_types::{ResourceType, ValidationStatus};
 
@@ -132,4 +138,106 @@ async fn service_instance_lifecycle() {
 
     let all = inv.all_services().await.unwrap();
     assert_eq!(all[0].status, ServiceStatus::Stopped);
+}
+
+// ── Bus handler tests ─────────────────────────────────────────────────────────
+
+async fn inventory_in_memory() -> Arc<Inventory> {
+    let inv = Inventory::open(DbConfig::sqlite(":memory:"))
+        .await
+        .expect("open failed");
+    Arc::new(inv)
+}
+
+#[tokio::test]
+async fn bus_handler_installs_package_on_event() {
+    let inv = inventory_in_memory().await;
+    let handler = InventoryBusHandler::new(Arc::clone(&inv));
+
+    let payload = PackageInstalledPayload {
+        id: "stalwart".into(),
+        version: "0.9.1".into(),
+        resource_type: fs_types::ResourceType::Container,
+        config_path: String::new(),
+        data_path: String::new(),
+    };
+    let event = Event::new(INVENTORY_PACKAGE_INSTALLED, "test", payload).unwrap();
+    handler.handle(&event).await.unwrap();
+
+    let resource = inv.resource("stalwart").await.unwrap();
+    assert!(resource.is_some());
+    assert_eq!(resource.unwrap().version, "0.9.1");
+}
+
+#[tokio::test]
+async fn bus_handler_updates_package_on_updated_event() {
+    let inv = inventory_in_memory().await;
+    let handler = InventoryBusHandler::new(Arc::clone(&inv));
+
+    // Install first
+    let p1 = PackageInstalledPayload {
+        id: "stalwart".into(),
+        version: "0.9.0".into(),
+        resource_type: fs_types::ResourceType::Container,
+        config_path: String::new(),
+        data_path: String::new(),
+    };
+    handler
+        .handle(&Event::new(INVENTORY_PACKAGE_INSTALLED, "test", p1).unwrap())
+        .await
+        .unwrap();
+
+    // Update via bus
+    let p2 = PackageInstalledPayload {
+        id: "stalwart".into(),
+        version: "0.9.1".into(),
+        resource_type: fs_types::ResourceType::Container,
+        config_path: String::new(),
+        data_path: String::new(),
+    };
+    handler
+        .handle(&Event::new(INVENTORY_PACKAGE_UPDATED, "test", p2).unwrap())
+        .await
+        .unwrap();
+
+    let resource = inv.resource("stalwart").await.unwrap().unwrap();
+    assert_eq!(resource.version, "0.9.1");
+}
+
+#[tokio::test]
+async fn bus_handler_removes_package_on_removed_event() {
+    let inv = inventory_in_memory().await;
+    let handler = InventoryBusHandler::new(Arc::clone(&inv));
+
+    // Install
+    let p = PackageInstalledPayload {
+        id: "stalwart".into(),
+        version: "0.9.0".into(),
+        resource_type: fs_types::ResourceType::Container,
+        config_path: String::new(),
+        data_path: String::new(),
+    };
+    handler
+        .handle(&Event::new(INVENTORY_PACKAGE_INSTALLED, "test", p).unwrap())
+        .await
+        .unwrap();
+
+    // Remove
+    let removal = PackageRemovedPayload {
+        id: "stalwart".into(),
+    };
+    handler
+        .handle(&Event::new(INVENTORY_PACKAGE_REMOVED, "test", removal).unwrap())
+        .await
+        .unwrap();
+
+    let resource = inv.resource("stalwart").await.unwrap();
+    assert!(resource.is_none(), "resource should be removed");
+}
+
+#[tokio::test]
+async fn bus_handler_topic_pattern_is_inventory_namespace() {
+    let inv = inventory_in_memory().await;
+    let handler = InventoryBusHandler::new(inv);
+    assert_eq!(handler.topic_pattern(), "inventory::*");
 }

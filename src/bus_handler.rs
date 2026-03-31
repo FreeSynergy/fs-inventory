@@ -1,9 +1,10 @@
-// bus_handler.rs — InventoryBusHandler: bridges fs-bus installer::* events to
+// bus_handler.rs — InventoryBusHandler: bridges fs-bus inventory::package::* events to
 // the Inventory database.
 //
 // Topic patterns handled:
-//   installer.package.installed  → upsert_resource(resource)
-//   installer.package.removed    → uninstall(id)
+//   inventory::package::installed  → upsert_resource(resource)
+//   inventory::package::removed    → uninstall(id)
+//   inventory::package::updated    → upsert_resource(resource) with new version
 //
 // The handler is intentionally lenient: unknown topics and malformed payloads
 // are logged as warnings and not propagated as errors so a bad message cannot
@@ -12,6 +13,9 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use fs_bus::topics::{
+    INVENTORY_PACKAGE_INSTALLED, INVENTORY_PACKAGE_REMOVED, INVENTORY_PACKAGE_UPDATED,
+};
 use fs_bus::{BusError, Event, TopicHandler};
 use serde::{Deserialize, Serialize};
 use tracing::{instrument, warn};
@@ -24,7 +28,7 @@ use fs_types::{ResourceType, ValidationStatus};
 
 // ── Payload types ─────────────────────────────────────────────────────────────
 
-/// Payload of `installer.package.installed`.
+/// Payload of `inventory::package::installed`.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct PackageInstalledPayload {
     /// Package id, e.g. `"kanidm"`.
@@ -46,7 +50,7 @@ fn default_resource_type() -> ResourceType {
     ResourceType::App
 }
 
-/// Payload of `installer.package.removed`.
+/// Payload of `inventory::package::removed`.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct PackageRemovedPayload {
     pub id: String,
@@ -54,7 +58,7 @@ pub struct PackageRemovedPayload {
 
 // ── InventoryBusHandler ───────────────────────────────────────────────────────
 
-/// Subscribes to `installer.#` bus events and keeps `fs-inventory.db` in sync.
+/// Subscribes to `inventory::package::*` bus events and keeps `fs-inventory.db` in sync.
 pub struct InventoryBusHandler {
     inventory: Arc<Inventory>,
 }
@@ -69,19 +73,18 @@ impl InventoryBusHandler {
 
 #[async_trait]
 impl TopicHandler for InventoryBusHandler {
-    #[allow(clippy::unnecessary_literal_bound)]
-    fn topic_pattern(&self) -> &str {
-        "installer.#"
+    fn topic_pattern(&self) -> &'static str {
+        "inventory::*"
     }
 
     #[instrument(name = "inventory.bus_handler", skip(self, event), fields(topic = event.topic()))]
     async fn handle(&self, event: &Event) -> Result<(), BusError> {
         match event.topic() {
-            "installer.package.installed" => {
+            INVENTORY_PACKAGE_INSTALLED | INVENTORY_PACKAGE_UPDATED => {
                 let payload: PackageInstalledPayload = match event.parse_payload() {
                     Ok(p) => p,
                     Err(e) => {
-                        warn!("installer.package.installed: bad payload: {e}");
+                        warn!("{}: bad payload: {e}", event.topic());
                         return Ok(());
                     }
                 };
@@ -100,11 +103,11 @@ impl TopicHandler for InventoryBusHandler {
                     warn!("inventory upsert failed: {e}");
                 }
             }
-            "installer.package.removed" => {
+            INVENTORY_PACKAGE_REMOVED => {
                 let payload: PackageRemovedPayload = match event.parse_payload() {
                     Ok(p) => p,
                     Err(e) => {
-                        warn!("installer.package.removed: bad payload: {e}");
+                        warn!("inventory::package::removed: bad payload: {e}");
                         return Ok(());
                     }
                 };

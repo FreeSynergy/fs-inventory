@@ -145,7 +145,10 @@ impl Inventory {
             .transpose()
     }
 
-    /// Insert a resource, or update its status if already installed.
+    /// Insert a resource, or update all mutable fields if already installed.
+    ///
+    /// On conflict (same id), updates `version`, `channel`, `status`, `config_path`,
+    /// `data_path`, and `validation` to reflect the new state.
     ///
     /// # Errors
     ///
@@ -158,8 +161,22 @@ impl Inventory {
         match self.install(resource).await {
             Ok(()) => Ok(()),
             Err(InventoryError::AlreadyInstalled { .. }) => {
-                self.set_resource_status(&resource.id, &resource.status)
-                    .await
+                // UPDATE all mutable fields, not just status.
+                let model = installed_resource::Entity::find_by_id(&resource.id)
+                    .one(&self.db)
+                    .await?
+                    .ok_or_else(|| InventoryError::NotFound {
+                        id: resource.id.clone(),
+                    })?;
+                let mut active: installed_resource::ActiveModel = model.into();
+                active.version = Set(resource.version.clone());
+                active.channel = Set(serde_json::to_string(&resource.channel)?);
+                active.status = Set(serde_json::to_string(&resource.status)?);
+                active.config_path = Set(resource.config_path.clone());
+                active.data_path = Set(resource.data_path.clone());
+                active.validation = Set(serde_json::to_string(&resource.validation)?);
+                active.update(&self.db).await?;
+                Ok(())
             }
             Err(e) => Err(e),
         }
