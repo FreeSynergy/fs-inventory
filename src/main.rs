@@ -9,9 +9,11 @@ use clap::Parser;
 use tracing::{error, info, warn};
 use tracing_subscriber::{fmt, EnvFilter};
 
+use fs_bus::MessageBus;
 use fs_inventory::{
     api::grpc::{GrpcInventory, InventoryServiceServer},
     api::rest,
+    bus_handler::InventoryBusHandler,
     cli::{Cli, Command},
     repo::Inventory,
     store::InventoryStore,
@@ -123,8 +125,16 @@ async fn cmd_serve(
 
     info!(db, grpc = %grpc_addr, rest = %rest_addr, "starting fs-inventory");
 
-    let inventory = Inventory::open(DbConfig::sqlite(db)).await?;
-    let shared: Arc<dyn InventoryStore> = Arc::new(inventory);
+    let inventory_arc = Arc::new(Inventory::open(DbConfig::sqlite(db)).await?);
+
+    // ── In-process bus ────────────────────────────────────────────────────────
+    let mut bus = MessageBus::new();
+    bus.add_handler(Arc::new(InventoryBusHandler::new(Arc::clone(
+        &inventory_arc,
+    ))));
+    let _bus = Arc::new(bus);
+
+    let shared: Arc<dyn InventoryStore> = inventory_arc;
 
     let grpc_svc = InventoryServiceServer::new(GrpcInventory::new(Arc::clone(&shared)));
     let grpc_server = tonic::transport::Server::builder()

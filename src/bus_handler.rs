@@ -74,7 +74,7 @@ impl InventoryBusHandler {
 #[async_trait]
 impl TopicHandler for InventoryBusHandler {
     fn topic_pattern(&self) -> &'static str {
-        "inventory::*"
+        "inventory::#"
     }
 
     #[instrument(name = "inventory.bus_handler", skip(self, event), fields(topic = event.topic()))]
