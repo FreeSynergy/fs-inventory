@@ -98,6 +98,7 @@ impl TopicHandler for InventoryBusHandler {
                     config_path: payload.config_path,
                     data_path: payload.data_path,
                     validation: ValidationStatus::Ok,
+                    caption: None,
                 };
                 if let Err(e) = self.inventory.upsert_resource(&resource).await {
                     warn!("inventory upsert failed: {e}");

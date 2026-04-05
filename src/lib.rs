@@ -40,7 +40,7 @@ pub use bus_handler::{InventoryBusHandler, PackageInstalledPayload, PackageRemov
 pub use error::InventoryError;
 pub use fs_db::DbConfig;
 pub use models::{
-    InstalledResource, ReleaseChannel, ResourceStatus, ServiceInstance, ServiceStatus,
+    InstalledResource, ProgramGroup, ReleaseChannel, ResourceStatus, ServiceInstance, ServiceStatus,
 };
 pub use repo::Inventory;
 pub use store::InventoryStore;

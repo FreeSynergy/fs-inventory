@@ -15,6 +15,8 @@ pub struct Model {
     pub config_path: String,
     pub data_path: String,
     pub validation: String,
+    /// Optional display name — `None` means "use the id as label".
+    pub caption: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

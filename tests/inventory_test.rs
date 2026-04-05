@@ -25,6 +25,7 @@ fn test_resource() -> InstalledResource {
         config_path: "/etc/kanidm/config.toml".to_string(),
         data_path: "/var/lib/kanidm".to_string(),
         validation: ValidationStatus::Ok,
+        caption: None,
     }
 }
 

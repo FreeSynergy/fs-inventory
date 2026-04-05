@@ -17,6 +17,7 @@ use tracing::instrument;
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 
+/// DDL for a fresh database — all columns present from the start.
 const SCHEMA: &str = "
 CREATE TABLE IF NOT EXISTS installed_resources (
     id            TEXT PRIMARY KEY NOT NULL,
@@ -27,7 +28,8 @@ CREATE TABLE IF NOT EXISTS installed_resources (
     status        TEXT NOT NULL DEFAULT '{\"state\":\"active\"}',
     config_path   TEXT NOT NULL DEFAULT '',
     data_path     TEXT NOT NULL DEFAULT '',
-    validation    TEXT NOT NULL DEFAULT 'incomplete'
+    validation    TEXT NOT NULL DEFAULT 'incomplete',
+    caption       TEXT
 );
 
 CREATE TABLE IF NOT EXISTS service_instances (
@@ -65,6 +67,11 @@ impl Inventory {
     pub async fn open(config: DbConfig) -> Result<Self, InventoryError> {
         let db = Database::connect(&config.url).await?;
         db.execute_unprepared(SCHEMA).await?;
+        // G1.4 migration: add caption column to databases created before this release.
+        // SQLite returns an error when the column already exists — we ignore it.
+        let _ = db
+            .execute_unprepared("ALTER TABLE installed_resources ADD COLUMN caption TEXT;")
+            .await;
         Ok(Self { db })
     }
 
@@ -96,6 +103,7 @@ impl Inventory {
             config_path: Set(resource.config_path.clone()),
             data_path: Set(resource.data_path.clone()),
             validation: Set(serde_json::to_string(&resource.validation)?),
+            caption: Set(resource.caption.clone()),
         }
         .insert(&self.db)
         .await?;
@@ -175,6 +183,7 @@ impl Inventory {
                 active.config_path = Set(resource.config_path.clone());
                 active.data_path = Set(resource.data_path.clone());
                 active.validation = Set(serde_json::to_string(&resource.validation)?);
+                active.caption = Set(resource.caption.clone());
                 active.update(&self.db).await?;
                 Ok(())
             }

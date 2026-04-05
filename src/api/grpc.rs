@@ -54,6 +54,7 @@ fn resource_to_proto(r: &InstalledResource) -> ResourceRecord {
         config_path: r.config_path.clone(),
         data_path: r.data_path.clone(),
         validation: serde_json::to_string(&r.validation).unwrap_or_default(),
+        caption: r.caption.clone().unwrap_or_default(),
     }
 }
 
@@ -68,6 +69,11 @@ fn proto_to_resource(r: ResourceRecord) -> InstalledResource {
         config_path: r.config_path,
         data_path: r.data_path,
         validation: serde_json::from_str(&r.validation).unwrap_or(ValidationStatus::Incomplete),
+        caption: if r.caption.is_empty() {
+            None
+        } else {
+            Some(r.caption)
+        },
     }
 }
 

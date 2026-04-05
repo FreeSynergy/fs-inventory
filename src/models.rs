@@ -83,6 +83,11 @@ pub struct InstalledResource {
     /// Path to the resource's data directory.
     pub data_path: String,
     pub validation: ValidationStatus,
+    /// Optional user-assigned display name for this resource.
+    ///
+    /// Used when multiple instances of the same program are running
+    /// (e.g. `"wiki.team-a"`, `"wiki.team-b"`).  Falls back to `id` when absent.
+    pub caption: Option<String>,
 }
 
 impl TryFrom<entity::installed_resource::Model> for InstalledResource {
@@ -99,8 +104,34 @@ impl TryFrom<entity::installed_resource::Model> for InstalledResource {
             config_path: m.config_path,
             data_path: m.data_path,
             validation: serde_json::from_str(&m.validation)?,
+            caption: m.caption,
         })
     }
+}
+
+// ── ProgramGroup ──────────────────────────────────────────────────────────────
+
+/// A logical group of installed resources that represent multiple instances
+/// of the same program (e.g. two Kanidm instances or three wiki instances).
+///
+/// The desktop shell renders the group as a single parent icon with sub-icons
+/// for each instance.  The `group_icon_key` is a namespaced icon reference
+/// in the format `"namespace:path"` (e.g. `"fs:apps/wiki"`) — the same value
+/// that `fs_render::IconRef::key` would carry.
+///
+/// # Design
+///
+/// `ProgramGroup` is a pure domain struct.  It deliberately uses `String`
+/// for `group_icon_key` so that this crate does not depend on `fs-render`.
+/// The rendering layer converts the key to an `IconRef` when building the menu.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProgramGroup {
+    /// The resource id of the primary / representative instance.
+    pub parent_id: String,
+    /// All instances that belong to this group.
+    pub instances: Vec<InstalledResource>,
+    /// Namespaced icon key (equivalent to `fs_render::IconRef::key`).
+    pub group_icon_key: String,
 }
 
 // ── ServiceStatus ─────────────────────────────────────────────────────────────

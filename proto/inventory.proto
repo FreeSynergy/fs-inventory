@@ -32,6 +32,7 @@ message ResourceRecord {
     string config_path   = 7;
     string data_path     = 8;
     string validation    = 9;  // JSON-encoded ValidationStatus
+    string caption       = 10; // Optional display name — empty string means "use id"
 }
 
 message UpsertResourceRequest  { ResourceRecord resource = 1; }
